@@ -6,10 +6,6 @@ description = "Set up and manage your hardware security keys"
 license = "Apache-2.0"
 repository = "https://github.com/blturan/keymate"
 authors = ["blturan"]
-# let chains (`if let ... && ...`) need Rust 1.88.
-rust-version = "1.88"
-# Released through GitHub and Homebrew, not crates.io.
-publish = false
 
 # For cargo-release: see Releasing in CONTRIBUTING.md.
 [package.metadata.release]

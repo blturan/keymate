@@ -1,0 +1,17 @@
+name: Idea or new service
+description: Suggest a feature, or a service Keymate should support
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like Keymate to do?
+      description: For a new service, say what it uses security keys for (SSH, signing, sign-in) and whether it has a CLI or API for registering keys.
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: What you do today without it, and what's hard about that.

@@ -1,0 +1,34 @@
+[package]
+name = "keymate"
+version = "0.1.0"
+edition = "2024"
+description = "Set up and manage your hardware security keys"
+license = "Apache-2.0"
+repository = "https://github.com/blturan/keymate"
+authors = ["blturan"]
+# let chains (`if let ... && ...`) need Rust 1.88.
+rust-version = "1.88"
+# Released through GitHub and Homebrew, not crates.io.
+publish = false
+
+# For cargo-release: see Releasing in CONTRIBUTING.md.
+[package.metadata.release]
+publish = false
+allow-branch = ["main"]
+sign-commit = true
+sign-tag = true
+tag-message = "keymate {{version}}"
+pre-release-commit-message = "chore: release {{version}}"
+
+[dependencies]
+base64 = "0.23"
+clap = { version = "4", features = ["derive"] }
+console = "0.16"
+ctrlc = "3"
+dialoguer = { version = "0.12", default-features = false }
+indicatif = "0.18"
+
+[profile.release]
+codegen-units = 1
+lto = "fat"
+strip = true

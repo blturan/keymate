@@ -23,6 +23,8 @@ class Keymate < Formula
 
   def install
     libexec.install Dir["keymate-*"].first => "keymate"
+    # A bare binary download doesn't preserve its executable permissions.
+    (libexec/"keymate").chmod 0755
     # Put the tools keymate needs first on its PATH, so it never picks up
     # macOS's ssh, which can't use security keys.
     paths = %w[openssh libfido2 gh git].map { |name| formula_opt_bin(name) }
@@ -30,6 +32,7 @@ class Keymate < Formula
   end
 
   test do
+    assert_predicate libexec/"keymate", :executable?
     assert_match "keymate", shell_output("#{bin}/keymate --version")
     assert_match "All required tools are installed", shell_output("#{bin}/keymate doctor --deps-only")
   end

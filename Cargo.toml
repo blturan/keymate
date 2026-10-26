@@ -1,6 +1,6 @@
 [package]
 name = "keymate"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "Set up and manage your hardware security keys"
 license = "Apache-2.0"

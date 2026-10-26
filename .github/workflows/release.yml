@@ -1,4 +1,4 @@
-name: create_new_release
+name: release
 
 on:
   push:
@@ -8,21 +8,20 @@ on:
 permissions:
   contents: write
 
-run-name: Releasing (${{ github.ref_name }})
+run-name: Releasing keymate ${{ github.ref_name }} by @${{ github.actor }}
 
 jobs:
   validate:
-    name: Validate Version
+    name: Validate version
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Fetch all tags
-        run: git fetch --tags --force
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Tag is signed
         run: |
+          git fetch --force origin "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
           git config gpg.format ssh
           git config gpg.ssh.allowedSignersFile .github/allowed_signers
           git verify-tag "$GITHUB_REF_NAME" || {
@@ -30,99 +29,72 @@ jobs:
             exit 1
           }
 
-      - name: Check Cargo.toml version matches tag
+      - name: Tag matches Cargo.toml
         run: |
-          TAG_VERSION="${{ github.ref_name }}"
-          TAG_VERSION="${TAG_VERSION#v}"
-          CARGO_VERSION=$(grep '^version' Cargo.toml | head -n1 | sed 's/.*"\(.*\)"/\1/')
-          if [ "$TAG_VERSION" != "$CARGO_VERSION" ]; then
-            echo "ERROR: Tag ${{ github.ref_name }} does not match Cargo.toml version $CARGO_VERSION"
-            exit 1
-          fi
-          echo "Cargo.toml version $CARGO_VERSION matches tag ${{ github.ref_name }}"
-
-      - name: Check version is greater than latest
-        run: |
-          NEW_TAG="${{ github.ref_name }}"
-          NEW_VERSION="${NEW_TAG#v}"
-
-          LATEST_TAG=$(git tag --sort=-version:refname | grep -v "^${NEW_TAG}$" | head -n1)
-
-          if [ -z "$LATEST_TAG" ]; then
-            echo "No previous tags found, proceeding."
-            exit 0
-          fi
-
-          LATEST_VERSION="${LATEST_TAG#v}"
-          LOWER=$(printf "%s\n%s" "$NEW_VERSION" "$LATEST_VERSION" | sort -V | head -n1)
-
-          if [ "$LOWER" = "$NEW_VERSION" ]; then
-            echo "ERROR: New tag $NEW_TAG is lower than latest $LATEST_TAG"
+          TAG="${GITHUB_REF_NAME#v}"
+          CARGO=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)
+          if [ "$TAG" != "$CARGO" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match Cargo.toml version $CARGO"
             exit 1
           fi
 
-          echo "Version $NEW_TAG is valid (latest was $LATEST_TAG)"
-
-  build:
-    name: Build for Apple silicon
-    needs: validate
-    runs-on: macos-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install Rust target
-        run: rustup target add aarch64-apple-darwin
-
-      - name: Build
-        run: cargo build --release --target aarch64-apple-darwin
-
-      - name: Rename binary
-        run: cp target/aarch64-apple-darwin/release/keymate keymate-aarch64-apple-darwin
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: keymate-aarch64-apple-darwin
-          path: keymate-aarch64-apple-darwin
-          retention-days: 1
+      - name: Tag is newer than the last one
+        run: |
+          LATEST=$(git tag --sort=-version:refname | grep -v "^${GITHUB_REF_NAME}$" | head -n 1)
+          [ -z "$LATEST" ] && exit 0
+          LOWER=$(printf '%s\n%s\n' "${GITHUB_REF_NAME#v}" "${LATEST#v}" | sort -V | head -n 1)
+          if [ "$LOWER" = "${GITHUB_REF_NAME#v}" ]; then
+            echo "::error::$GITHUB_REF_NAME is not newer than $LATEST"
+            exit 1
+          fi
 
   release:
-    name: Create Release
-    needs: build
-    runs-on: ubuntu-latest
+    name: Build and publish
+    needs: validate
+    runs-on: macos-latest
+    environment: release
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.repository.default_branch }}
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
 
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          merge-multiple: true
+      - name: Build the binary
+        run: |
+          cargo build --release --target aarch64-apple-darwin
+          cp target/aarch64-apple-darwin/release/keymate keymate-aarch64-apple-darwin
 
-      - name: Create GitHub Release
+      # Releases are immutable once published, so upload to a draft first.
+      - name: Create the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create ${{ github.ref_name }} \
-            --title "${{ github.ref_name }}" \
+          gh release create "$GITHUB_REF_NAME" \
+            --title "keymate ${GITHUB_REF_NAME#v}" \
             --generate-notes \
+            --draft \
             keymate-aarch64-apple-darwin
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "$GITHUB_REF_NAME" --draft=false
 
       - name: Point the Homebrew formula at it
         run: |
+          git fetch origin "${{ github.event.repository.default_branch }}"
+          git checkout "${{ github.event.repository.default_branch }}"
           VERSION="${GITHUB_REF_NAME#v}"
-          SHA=$(sha256sum keymate-aarch64-apple-darwin | cut -d ' ' -f 1)
-          sed -i \
+          SHA=$(shasum -a 256 keymate-aarch64-apple-darwin | cut -d ' ' -f 1)
+          OWNER="${{ github.repository_owner }}"
+          sed -i '' \
             -e "s#/download/v[^/]*/#/download/v$VERSION/#" \
             -e "s/^  version \".*\"/  version \"$VERSION\"/" \
             -e "s/^  sha256 \".*\"/  sha256 \"$SHA\"/" \
+            -e "s#github\.com/[^/\"]*/keymate#github.com/$OWNER/keymate#g" \
+            -e "s#brew tap [^/]*/keymate#brew tap $OWNER/keymate#" \
             Formula/keymate.rb
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add Formula/keymate.rb
-          git commit -m "chore: update Homebrew formula to keymate $VERSION" || exit 0
+          git commit -m "chore: update Homebrew formula to keymate ${GITHUB_REF_NAME#v}" || exit 0
           git push origin HEAD

@@ -11,7 +11,7 @@ class Keymate < Formula
   homepage "https://github.com/blturan/keymate"
   url "https://github.com/blturan/keymate/releases/download/v0.1.0/keymate-aarch64-apple-darwin"
   version "0.1.0"
-  sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+  sha256 "588dd3625102c7ba15922516ef5309415db6aec66d18c2e73b9afea9cf9338bb"
   license "Apache-2.0"
 
   depends_on arch: :arm64

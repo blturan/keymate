@@ -9,9 +9,9 @@
 class Keymate < Formula
   desc "Set up and manage your hardware security keys"
   homepage "https://github.com/blturan/keymate"
-  url "https://github.com/blturan/keymate/releases/download/v0.1.0/keymate-aarch64-apple-darwin"
-  version "0.1.0"
-  sha256 "588dd3625102c7ba15922516ef5309415db6aec66d18c2e73b9afea9cf9338bb"
+  url "https://github.com/blturan/keymate/releases/download/v0.1.1/keymate-aarch64-apple-darwin"
+  version "0.1.1"
+  sha256 "58f13d66df3a4f2a54a48bee4068b79b4c08b8643a93262703314341595665a7"
   license "Apache-2.0"
 
   depends_on arch: :arm64
